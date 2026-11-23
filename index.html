@@ -213,7 +213,7 @@
   }
 };
 
-  var state = { screen: 'trip', detail: 'muv10', pending: 'muv10', applied: null, filter: 'all', code: '', errL1: '', errL2: '', errDetail: false, booked: false };
+  var state = { screen: 'trip', detail: 'muv10', applied: null, success: false, filter: 'all', code: '', errL1: '', errL2: '', errDetail: false, booked: false };
   var app = document.getElementById('app');
 
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -288,15 +288,17 @@
       '<div class="footer">' + (d.usable ? '<button class="btn" data-action="pick" data-id="' + state.detail + '">เลือกใช้โค้ดนี้</button>' : '<button class="btn" disabled>ยังใช้กับทริปนี้ไม่ได้</button>') + '</div></div>';
   }
 
-  function checkScreen() {
-    var p = CODES[state.pending];
-    return '<div class="screen">' + header('ตรวจสอบโค้ด', 'goPromo') + '<div class="content" style="padding-top:16px">' +
-      '<p style="font-size:17px;font-weight:700">โค้ดส่วนลด</p>' +
-      '<div style="display:flex;gap:10px"><div class="code-field"><span class="nw" style="font-size:16px;font-weight:700">' + p.short + '</span><span class="check-circle" style="width:26px;height:26px">' + ICON.check(15) + '</span></div><button class="nw" style="height:52px;padding:0 18px;border:0;border-radius:14px;background:#E8F0FD;color:#1559DE;font-size:16px;font-weight:700" data-action="goPromo">เปลี่ยน</button></div>' +
-      '<div class="applied" style="padding:14px;gap:12px"><span class="check-circle" style="width:40px;height:40px">' + ICON.check(22) + '</span><span style="flex:1;min-width:0"><span class="nw" style="display:block;font-size:17px;font-weight:700;color:#14532D">ใช้โค้ดสำเร็จ!</span><span class="nw" style="display:block;font-size:13px;color:#166534">' + p.pNote + '</span></span></div>' +
-      '<div class="summary"><p style="font-size:17px;font-weight:700">สรุปค่าโดยสาร</p><div class="sum-row nw" style="color:#4B5563;gap:12px"><span>ค่าโดยสารก่อนส่วนลด</span><span style="color:#1F2937">154 ฿</span></div><div class="sum-row nw" style="gap:12px"><span style="color:#1E7B45;font-weight:600">' + p.rowLabel + '</span><span style="color:#1E7B45;font-weight:700">' + p.rowValue + '</span></div><div style="height:1px;background:#E5E7EB"></div><div class="sum-row nw" style="align-items:baseline"><span style="font-size:18px;font-weight:700">ยอดชำระสุทธิ</span><span style="font-size:30px;font-weight:700;color:#1559DE">' + p.total + '</span></div></div>' +
-      '<button class="row-btn" data-action="detail" data-id="' + state.pending + '">รายละเอียดโปรโมชัน' + ICON.chevron + '</button></div>' +
-      '<div class="footer"><button class="btn" data-action="confirm">ยืนยันใช้โค้ด</button></div></div>';
+  function successOverlay() {
+    var ap = CODES[state.applied];
+    return '<div class="overlay" style="justify-content:center;align-items:center;padding:0 24px"><div role="dialog" aria-modal="true" aria-label="ใช้โปรโมโค้ดสำเร็จ" style="width:100%;max-width:342px;background:#fff;border-radius:24px;padding:28px 22px 22px;display:flex;flex-direction:column;align-items:center;gap:14px">' +
+      '<span class="check-circle" style="width:64px;height:64px;background:#E6F6EC;color:#1E9E52">' + ICON.check(32) + '</span>' +
+      '<p class="nw" style="font-size:17px;font-weight:700;max-width:100%">ใช้โปรโมโค้ด ' + ap.short + ' สำเร็จ!</p>' +
+      '<div style="width:100%;background:#F4F7FC;border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:8px">' +
+      '<div class="sum-row nw" style="gap:12px;color:#4B5563"><span>ค่าโดยสาร</span><span style="color:#1F2937">154 ฿</span></div>' +
+      '<div class="sum-row nw" style="gap:12px"><span style="color:#1E7B45;font-weight:600">' + ap.rowLabel + '</span><span style="color:#1E7B45;font-weight:700">' + ap.rowValue + '</span></div>' +
+      '<div style="height:1px;background:#E1E7F2"></div>' +
+      '<div class="sum-row nw" style="gap:12px;align-items:baseline"><span style="font-size:16px;font-weight:700">ยอดชำระ</span><span style="font-size:24px;font-weight:700;color:#1559DE">' + ap.total + '</span></div></div>' +
+      '<button class="btn" style="height:50px;font-size:17px" data-action="closeSuccess">ตกลง</button></div></div>';
   }
 
   function bookedOverlay() {
@@ -306,7 +308,8 @@
   }
 
   function render() {
-    var html = { trip: tripScreen, promo: promoScreen, detail: detailScreen, check: checkScreen }[state.screen]();
+    var html = { trip: tripScreen, promo: promoScreen, detail: detailScreen }[state.screen]();
+    if (state.success && state.applied) html += successOverlay();
     if (state.booked) html += bookedOverlay();
     app.innerHTML = html;
     var sc = app.querySelector('.content'); if (sc) sc.scrollTop = 0;
@@ -318,14 +321,14 @@
     switch (el.getAttribute('data-action')) {
       case 'goPromo': set({ screen: 'promo' }); break;
       case 'goTrip': set({ screen: 'trip', errL1: '' }); break;
-      case 'applyBest': set({ pending: 'muv10', screen: 'check' }); break;
+      case 'applyBest': set({ applied: 'muv10', success: true }); break;
       case 'detail': set({ detail: id, screen: 'detail' }); break;
-      case 'pick': set({ pending: id, screen: 'check', errL1: '' }); break;
+      case 'pick': set({ applied: id, screen: 'trip', success: true, errL1: '' }); break;
       case 'filter': set({ filter: id }); break;
-      case 'confirm': set({ applied: state.pending, screen: 'trip', errL1: '' }); break;
+      case 'closeSuccess': set({ success: false }); break;
       case 'book': set({ booked: true }); break;
       case 'closeBooked': set({ booked: false }); break;
-      case 'restart': state = { screen: 'trip', detail: 'muv10', pending: 'muv10', applied: null, filter: 'all', code: '', errL1: '', errL2: '', errDetail: false, booked: false }; render(); break;
+      case 'restart': state = { screen: 'trip', detail: 'muv10', applied: null, success: false, filter: 'all', code: '', errL1: '', errL2: '', errDetail: false, booked: false }; render(); break;
     }
   });
   app.addEventListener('input', function (e) {
@@ -337,7 +340,7 @@
     e.preventDefault();
     var c = (state.code || '').trim().toUpperCase();
     if (!c) return;
-    if (c === 'MUV10') set({ pending: 'muv10', screen: 'check', errL1: '' });
+    if (c === 'MUV10') set({ applied: 'muv10', screen: 'trip', success: true, errL1: '' });
     else if (c === 'RIDE20') set({ errL1: 'โค้ดนี้ไม่ตรงตามเงื่อนไข', errL2: 'ยอดขั้นต่ำ 200 ฿ (ทริปนี้ 154 ฿)', errDetail: true });
     else set({ errL1: 'ไม่พบโค้ด "' + c + '"', errL2: 'กรุณาตรวจสอบตัวสะกดอีกครั้ง', errDetail: false });
   });
